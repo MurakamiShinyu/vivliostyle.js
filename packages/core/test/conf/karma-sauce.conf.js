@@ -44,11 +44,11 @@ module.exports = function (config) {
   var options = {
     reporters: ["verbose", "saucelabs"],
     sauceLabs: {
-      build: process.env.TRAVIS_BUILD_NUMBER,
+      build: process.env.GITHUB_RUN_ID,
       testName: "Vivliostyle.js",
       recordScreenshots: false,
       startConnect: false, // Sauce Connect is started by Travis CI
-      tunnelIdentifier: process.env.TRAVIS_JOB_NUMBER,
+      tunnelIdentifier: process.env.GITHUB_RUN_NUMBER,
     },
     captureTimeout: 120000,
     customLaunchers: customLaunchers,
