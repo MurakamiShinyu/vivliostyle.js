@@ -8,8 +8,8 @@ function setup-git() {
     git config user.email "vivliostyle@vivliostyle.org"
     git config user.name "CI"
     mkdir -p ~/.ssh
-    echo -e "$GITHUB_DEPLOY_KEY_VIVLIOSTYLE_ORG" | base64 -d > ~/.ssh/deploy-vivliostyle-org.key
-    echo -e "$GITHUB_DEPLOY_KEY_VIVLIOSTYLE_GITHUB_IO" | base64 -d > ~/.ssh/deploy-vivliostyle-github-io.key
+    echo -e "$DEPLOY_KEY_VIVLIOSTYLE_ORG" | base64 -d > ~/.ssh/deploy-vivliostyle-org.key
+    echo -e "$DEPLOY_KEY_VIVLIOSTYLE_GITHUB_IO" | base64 -d > ~/.ssh/deploy-vivliostyle-github-io.key
     chmod 600 ~/.ssh/deploy-vivliostyle-org.key
     chmod 600 ~/.ssh/deploy-vivliostyle-github-io.key
     echo -e "Host github-vivliostyle-org\n\tStrictHostKeyChecking no\nHostName github.com\nIdentityFile ~/.ssh/deploy-vivliostyle-org.key\n" > ~/.ssh/config
