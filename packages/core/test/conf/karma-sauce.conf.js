@@ -47,8 +47,7 @@ module.exports = function (config) {
       build: process.env.GITHUB_RUN_NUMBER,
       testName: "Vivliostyle.js",
       recordScreenshots: false,
-      startConnect: true, // ! Sauce Connect is started by Travis CI
-      // tunnelIdentifier: process.env.TRAVIS_JOB_NUMBER,
+      startConnect: true,
     },
     captureTimeout: 120000,
     customLaunchers: customLaunchers,

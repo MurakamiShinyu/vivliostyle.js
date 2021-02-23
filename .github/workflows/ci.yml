@@ -17,3 +17,4 @@ jobs:
         env:
           SAUCE_USERNAME: ${{secrets.SAUCE_USERNAME}}
           SAUCE_ACCESS_KEY: ${{secrets.SAUCE_ACCESS_KEY}}
+      - run: scripts/ci-after-success-hook.sh
