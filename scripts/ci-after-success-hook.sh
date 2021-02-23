@@ -1,7 +1,7 @@
 #!/bin/bash
 set -eo pipefail
 
-DEBUG_HOOK=true #false
+DEBUG_HOOK=false
 
 function setup-git() {
     echo "===> Configuring credentials"
@@ -129,7 +129,7 @@ if [[ $IS_VALID_TAG = true ]]; then
     if [[ $STABLE_RELEASE = true ]]; then
         [[ $DEBUG_HOOK = false ]] && github-release upload \
             "${TAGGED_ARCHIVE}" \
-            --token "${GH_TOKEN}" \
+            --token "${GITHUB_TOKEN}" \
             --owner vivliostyle \
             --repo vivliostyle.js \
             --tag "${TAG}" \
@@ -138,7 +138,7 @@ if [[ $IS_VALID_TAG = true ]]; then
     else
         [[ $DEBUG_HOOK = false ]] && github-release upload \
             "${TAGGED_ARCHIVE}" \
-            --token "${GH_TOKEN}" \
+            --token "${GITHUB_TOKEN}" \
             --owner vivliostyle \
             --repo vivliostyle.js \
             --tag "${TAG}" \
