@@ -7,6 +7,7 @@ function setup-git() {
     echo "===> Configuring credentials"
     git config user.email "vivliostyle@vivliostyle.org"
     git config user.name "CI"
+    mkdir -p ~/.ssh
     echo -e "$GITHUB_DEPLOY_KEY_VIVLIOSTYLE_ORG" | base64 -d > ~/.ssh/deploy-vivliostyle-org.key
     echo -e "$GITHUB_DEPLOY_KEY_VIVLIOSTYLE_GITHUB_IO" | base64 -d > ~/.ssh/deploy-vivliostyle-github-io.key
     chmod 600 ~/.ssh/deploy-vivliostyle-org.key
@@ -84,7 +85,6 @@ inject-env-var
 
 echo "===> DEBUG_HOOK=${DEBUG_HOOK}"
 echo "===> GITHUB_REF=${GITHUB_REF}"
-echo "===> CI_BRANCH=${CI_BRANCH}"
 echo "===> TAG=${TAG}"
 echo "===> PULL_REQUEST=${PULL_REQUEST}"
 echo "===> IS_TAG_BUILD=${IS_TAG_BUILD}"
