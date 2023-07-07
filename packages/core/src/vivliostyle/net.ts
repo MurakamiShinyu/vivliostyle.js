@@ -39,6 +39,9 @@ export enum XMLHttpRequestResponseType {
 
 export type Response = Net.Response;
 
+export let epubDecrypters: { [key: string]: (p1: Blob) => Task.Result<Blob> } =
+  {};
+
 export function ajax(
   url: string,
   opt_type?: XMLHttpRequestResponseType,
@@ -47,6 +50,31 @@ export function ajax(
   opt_contentType?: string,
 ): Task.Result<Response> {
   const frame: Task.Frame<Response> = Task.newFrame("ajax");
+
+  const decrypter =
+    opt_type === XMLHttpRequestResponseType.BLOB ? null : epubDecrypters?.[url];
+  if (decrypter) {
+    ajax(url, XMLHttpRequestResponseType.BLOB).then((xhr1) => {
+      if (!xhr1.responseBlob) {
+        frame.finish(xhr1);
+        return;
+      }
+      decrypter(xhr1.responseBlob).then((blob) => {
+        ajax(
+          createObjectURL(blob),
+          opt_type,
+          opt_method,
+          opt_data,
+          opt_contentType,
+        ).then((xhr2) => {
+          xhr2.url = url;
+          frame.finish(xhr2);
+        });
+      });
+    });
+    return frame.result();
+  }
+
   const request = new XMLHttpRequest();
   const continuation = frame.suspend(request);
   const response: Response = {
@@ -323,6 +351,24 @@ export function loadElement(
 ): TaskUtil.Fetcher<string> {
   const fetcher = new TaskUtil.Fetcher(() => {
     const frame: Task.Frame<string> = Task.newFrame("loadElement");
+
+    const decrypter = epubDecrypters?.[src];
+    if (decrypter) {
+      ajax(src, XMLHttpRequestResponseType.BLOB).then((xhr) => {
+        if (!xhr.responseBlob) {
+          frame.finish("error");
+          return;
+        }
+        decrypter(xhr.responseBlob).then((blob) => {
+          const fetcher2 = loadElement(elem, createObjectURL(blob));
+          fetcher2.get().then((type) => {
+            frame.finish(type);
+          });
+        });
+      });
+      return frame.result();
+    }
+
     const continuation = frame.suspend(elem);
     let done = false;
     const handler = (evt: Event) => {

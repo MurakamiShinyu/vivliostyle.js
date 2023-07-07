@@ -1417,7 +1417,13 @@ export class ViewFactory
             }
             return false;
           };
-          if (!hasAutoWidth && !hasAutoHeight && !isInsideRunningElement()) {
+          const decrypter = Net.epubDecrypters?.[delayedSrc];
+          if (
+            !decrypter &&
+            !hasAutoWidth &&
+            !hasAutoHeight &&
+            !isInsideRunningElement()
+          ) {
             // No need to wait for the image, does not affect layout
             this.page.fetchers.push(imageFetcher);
           } else {

@@ -498,6 +498,65 @@ function makeDigest(algorithm: string, str: string): Task.Result<Uint8Array> {
   return frame.result();
 }
 
+export function makeDecrypter(uid: string): (p1: Blob) => Task.Result<Blob> {
+  // for test
+  const hexKey =
+    "87fb7a5c9358aa21d1ea991d9f17781c20c3d420718f6342592e06b0421a220c";
+  const rawKey = new Uint8Array(32);
+  for (let i = 0; i < 32; i++) {
+    rawKey[i] = parseInt(hexKey.substr(i * 2, 2), 16);
+  }
+  return (blob) => {
+    const frame = Task.newFrame("decrypter") as Task.Frame<Blob>;
+
+    makeCryptoKey(rawKey).then((key) => {
+      Net.readBlob(blob).then((buf) => {
+        const iv = buf.slice(0, 16);
+        const cipher = buf.slice(16);
+
+        doDecrypt(key, iv, cipher).then((buf) => {
+          frame.finish(Net.makeBlob([buf]));
+        });
+      });
+    });
+
+    return frame.result();
+  };
+}
+
+function makeCryptoKey(rawKey: Uint8Array): Task.Result<CryptoKey> {
+  const frame: Task.Frame<CryptoKey> = Task.newFrame("makeCryptoKey");
+  const continuation = frame.suspend();
+  window.crypto.subtle
+    .importKey("raw", rawKey, "AES-CBC", true, ["decrypt"])
+    .then((key) => {
+      continuation.schedule(key);
+    });
+  return frame.result();
+}
+
+function doDecrypt(
+  key: CryptoKey,
+  iv: ArrayBuffer,
+  cipher: ArrayBuffer,
+): Task.Result<ArrayBuffer> {
+  const frame: Task.Frame<ArrayBuffer> = Task.newFrame("doDecrypt");
+  const continuation = frame.suspend();
+  window.crypto.subtle
+    .decrypt(
+      {
+        name: "AES-CBC",
+        iv: iv,
+      },
+      key,
+      cipher,
+    )
+    .then((buf) => {
+      continuation.schedule(buf);
+    });
+  return frame.result();
+}
+
 type RawMeta = {
   [key: string]: RawMetaItem[];
 };
@@ -964,6 +1023,24 @@ export class OPFDoc {
           .child("CipherData")
           .child("CipherReference")
           .attribute("URI");
+    const cryptoURLs = !encXML
+      ? []
+      : encXML
+          .doc()
+          .child("encryption")
+          .child("EncryptedData")
+          .predicate(
+            XmlDoc.predicate.withChild(
+              "EncryptionMethod",
+              XmlDoc.predicate.withAttribute(
+                "Algorithm",
+                "http://www.w3.org/2001/04/xmlenc#aes256-cbc",
+              ),
+            ),
+          )
+          .child("CipherData")
+          .child("CipherReference")
+          .attribute("URI");
     const mediaTypeElems = pkg
       .child("bindings")
       .child("mediaType")
@@ -992,6 +1069,12 @@ export class OPFDoc {
       const deobfuscator = makeDeobfuscator(this.uid);
       for (let i = 0; i < idpfObfURLs.length; i++) {
         this.store.deobfuscators[this.pubURL + idpfObfURLs[i]] = deobfuscator;
+      }
+    }
+    if (cryptoURLs.length > 0 && this.uid) {
+      const decrypter = makeDecrypter(this.uid);
+      for (let i = 0; i < cryptoURLs.length; i++) {
+        Net.epubDecrypters[this.pubURL + cryptoURLs[i]] = decrypter;
       }
     }
     if (this.prePaginated) {
