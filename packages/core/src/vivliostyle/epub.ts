@@ -498,18 +498,71 @@ function makeDigest(algorithm: string, str: string): Task.Result<Uint8Array> {
   return frame.result();
 }
 
-export function makeDecrypter(uid: string): (p1: Blob) => Task.Result<Blob> {
-  // for test
-  const hexKey =
-    "87fb7a5c9358aa21d1ea991d9f17781c20c3d420718f6342592e06b0421a220c";
-  const rawKey = new Uint8Array(32);
-  for (let i = 0; i < 32; i++) {
-    rawKey[i] = parseInt(hexKey.substr(i * 2, 2), 16);
+export function makeDecrypter(
+  uid: string,
+  keyDataURL: string,
+): (p1: Blob) => Task.Result<Blob> {
+  let cryptKey: CryptoKey | null = null;
+
+  function fetchKeyData(): Task.Result<Uint8Array> {
+    const frame: Task.Frame<Uint8Array> = Task.newFrame("fetchKeyData");
+    const continuation = frame.suspend();
+    fetch(keyDataURL, { cache: "no-store" })
+      .then((response) => {
+        if (response.status >= 400) {
+          Logging.logger.error("Failed to fetch key data");
+        }
+        return response.text();
+      })
+      .then((text) => {
+        let keyData: Uint8Array | null = null;
+        try {
+          keyData = Uint8Array.from(atob(text), (m) => m.codePointAt(0));
+        } catch (e) {
+          Logging.logger.error("Failed to decode key data");
+        }
+        continuation.schedule(keyData);
+      });
+    return frame.result();
   }
+
+  function fetchAndDecryptKeyData(): Task.Result<CryptoKey> {
+    const frame: Task.Frame<CryptoKey> = Task.newFrame(
+      "fetchAndDecryptKeyData",
+    );
+    if (cryptKey) {
+      frame.finish(cryptKey);
+    } else {
+      makeDigest("SHA-256", uid).then((hash1) => {
+        makeCryptoKey(hash1).then((key1) => {
+          fetchKeyData().then((keyData) => {
+            if (keyData?.length !== 64) {
+              frame.finish(null);
+              return;
+            }
+            const iv1 = keyData.slice(0, 16);
+            const cipher1 = keyData.slice(16);
+            doDecrypt(key1, iv1, cipher1).then((rawKeyBuf) => {
+              const rawKey = new Uint8Array(rawKeyBuf);
+              makeCryptoKey(rawKey).then((key) => {
+                cryptKey = key;
+                frame.finish(key);
+              });
+            });
+          });
+        });
+      });
+    }
+    return frame.result();
+  }
+
   return (blob) => {
     const frame = Task.newFrame("decrypter") as Task.Frame<Blob>;
-
-    makeCryptoKey(rawKey).then((key) => {
+    fetchAndDecryptKeyData().then((key) => {
+      if (!key) {
+        frame.finish(null);
+        return;
+      }
       Net.readBlob(blob).then((buf) => {
         const iv = buf.slice(0, 16);
         const cipher = buf.slice(16);
@@ -519,7 +572,6 @@ export function makeDecrypter(uid: string): (p1: Blob) => Task.Result<Blob> {
         });
       });
     });
-
     return frame.result();
   };
 }
@@ -1038,9 +1090,38 @@ export class OPFDoc {
               ),
             ),
           )
+          .predicate(
+            XmlDoc.predicate.withChild(
+              "KeyInfo",
+              XmlDoc.predicate.withChild("RetrievalMethod"),
+            ),
+          )
           .child("CipherData")
           .child("CipherReference")
           .attribute("URI");
+
+    const keyDataURL =
+      cryptoURLs.length === 0
+        ? null
+        : `${this.pubURL}META-INF/${
+            encXML
+              .doc()
+              .child("encryption")
+              .child("EncryptedData")
+              .predicate(
+                XmlDoc.predicate.withChild(
+                  "EncryptionMethod",
+                  XmlDoc.predicate.withAttribute(
+                    "Algorithm",
+                    "http://www.w3.org/2001/04/xmlenc#aes256-cbc",
+                  ),
+                ),
+              )
+              .child("KeyInfo")
+              .child("RetrievalMethod")
+              .attribute("URI")[0]
+          }`;
+
     const mediaTypeElems = pkg
       .child("bindings")
       .child("mediaType")
@@ -1072,7 +1153,7 @@ export class OPFDoc {
       }
     }
     if (cryptoURLs.length > 0 && this.uid) {
-      const decrypter = makeDecrypter(this.uid);
+      const decrypter = makeDecrypter(this.uid, keyDataURL);
       for (let i = 0; i < cryptoURLs.length; i++) {
         Net.epubDecrypters[this.pubURL + cryptoURLs[i]] = decrypter;
       }

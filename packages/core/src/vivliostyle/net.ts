@@ -60,6 +60,10 @@ export function ajax(
         return;
       }
       decrypter(xhr1.responseBlob).then((blob) => {
+        if (!blob) {
+          frame.finish(xhr1);
+          return;
+        }
         ajax(
           createObjectURL(blob),
           opt_type,
