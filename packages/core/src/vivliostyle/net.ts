@@ -69,7 +69,9 @@ export function ajax(
           opt_type,
           opt_method,
           opt_data,
-          opt_contentType,
+          opt_contentType ?? opt_type === XMLHttpRequestResponseType.DOCUMENT
+            ? "application/xml; charset=UTF-8"
+            : undefined,
         ).then((xhr2) => {
           xhr2.url = url;
           frame.finish(xhr2);
@@ -146,6 +148,9 @@ export function ajax(
         opt_contentType || "text/plain; charset=UTF-8",
       );
       request.send(opt_data);
+    } else if (opt_contentType) {
+      request.overrideMimeType(opt_contentType);
+      request.send(null);
     } else {
       if (
         /^file:|^https?:\/\/[^/]+\.githubusercontent\.com|\.(xhtml|xht|opf)$/i.test(
